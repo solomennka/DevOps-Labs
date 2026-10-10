@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+certs/*.key
+certs/*.crt
+nginx/htpasswd
+venv/
+.env.*
+!.env.example
+.vscode/
+.DS_Store

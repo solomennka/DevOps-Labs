@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Мои заметки</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+    body { max-width: 760px; margin: 48px auto; padding: 0 18px; color: #202938; background: #f5f7fb; }
+    main { background: white; border: 1px solid #e0e5ef; border-radius: 16px; padding: 26px; box-shadow: 0 8px 30px #18233a0a; }
+    h1 { margin-top: 0; }
+    p { line-height: 1.5; }
+    form { display: flex; gap: 10px; margin: 22px 0; }
+    input { flex: 1; min-width: 0; padding: 12px; border: 1px solid #cbd3e1; border-radius: 9px; font: inherit; }
+    button { padding: 12px 16px; border: 0; border-radius: 9px; background: #3157c8; color: white; font: inherit; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #status { color: #56647a; font-size: .92rem; }
+    #message { min-height: 1.4em; color: #9b2738; }
+    li { padding: 12px 0; border-bottom: 1px solid #edf0f5; overflow-wrap: anywhere; }
+    time { display: block; color: #788397; font-size: .8rem; margin-top: 5px; }
+    @media (max-width: 520px) { form { flex-direction: column; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Мои заметки</h1>
+    <p>Добавьте заметку. Она сохраняется в PostgreSQL, поэтому останется после перезагрузки страницы.</p>
+    <p id="status">Подключаемся к сервису…</p>
+    <form id="note-form">
+      <input id="note-text" name="text" maxlength="500" placeholder="Например, повторить nginx" required>
+      <button id="submit-button" type="submit">Сохранить</button>
+    </form>
+    <p id="message" role="status"></p>
+    <h2>Сохранённые заметки</h2>
+    <ul id="notes"></ul>
+  </main>
+  <script>
+    const statusLine = document.querySelector('#status');
+    const list = document.querySelector('#notes');
+    const message = document.querySelector('#message');
+    const form = document.querySelector('#note-form');
+    const input = document.querySelector('#note-text');
+    const button = document.querySelector('#submit-button');
+
+    async function loadNotes() {
+      const response = await fetch('/api/notes');
+      if (!response.ok) throw new Error(`Сервер ответил ${response.status}`);
+      const data = await response.json();
+      statusLine.textContent = `API отвечает: ${data.instance}. Записей в базе: ${data.notes.length}.`;
+      list.replaceChildren();
+      for (const note of data.notes) {
+        const item = document.createElement('li');
+        item.append(document.createTextNode(note.text));
+        const time = document.createElement('time');
+        time.textContent = new Date(note.created_at).toLocaleString('ru-RU');
+        item.append(time);
+        list.append(item);
+      }
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      message.textContent = '';
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: input.value })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Ошибка ${response.status}`);
+        input.value = '';
+        await loadNotes();
+        message.style.color = '#26734d';
+        message.textContent = `Сохранено через ${data.instance}.`;
+      } catch (error) {
+        message.style.color = '#9b2738';
+        message.textContent = `Не удалось сохранить: ${error.message}`;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    loadNotes().catch((error) => {
+      statusLine.textContent = 'Не удалось загрузить заметки.';
+      message.textContent = error.message;
+    });
+  </script>
+</body>
+</html>
